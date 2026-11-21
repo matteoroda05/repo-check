@@ -12,11 +12,13 @@ import (
 )
 
 type Repository struct {
-	Path   string
+	Path string
+	// GitDir is the metadata directory shared by linked worktrees.
 	GitDir string
 	repo   *git.Repository
 }
 
+// Open loads the checkout at path and resolves its common Git directory.
 func Open(path string) (*Repository, error) {
 	if _, err := os.Stat(filepath.Join(path, ".git")); err != nil {
 		if errors.Is(err, os.ErrNotExist) {

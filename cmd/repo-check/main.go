@@ -1,3 +1,4 @@
+// Repo-check registers Git checkouts and reports how they compare with their remotes.
 package main
 
 import (
@@ -29,6 +30,7 @@ func main() {
 	os.Exit(code)
 }
 
+// run returns 0 on success, 1 on an operational error, or 2 on incorrect usage.
 func run(ctx context.Context, args []string) int {
 	command := "check"
 	if len(args) > 0 {
@@ -44,6 +46,7 @@ func run(ctx context.Context, args []string) int {
 		return 2
 	}
 
+	// Parse only the flags supported by the chosen command.
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	flags.Usage = func() { fmt.Fprint(flags.Output(), usage) }
 	var folder bool
@@ -60,6 +63,7 @@ func run(ctx context.Context, args []string) int {
 		return 2
 	}
 
+	// Load the registry from the override path or the user's config directory.
 	path := os.Getenv("REPO_CHECK_CONFIG")
 	if path == "" {
 		var err error
@@ -72,6 +76,7 @@ func run(ctx context.Context, args []string) int {
 	if err != nil {
 		return fail(fmt.Errorf("read configuration %s: %w", path, err))
 	}
+	// Validate the command's inputs before handing off to add or check.
 	if command == "add" {
 		if flags.NArg() != 1 {
 			flags.Usage()
@@ -110,6 +115,7 @@ func register(registry config.Registry, configPath, input string, folder bool) i
 	return 0
 }
 
+// runCheck can report discovery errors and still check the paths it found.
 func runCheck(ctx context.Context, registry config.Registry, selectors []string, workers int) int {
 	paths, scanErr := check.Discover(registry)
 	code := 0

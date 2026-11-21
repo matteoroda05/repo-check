@@ -15,6 +15,8 @@ import (
 	"github.com/matteoroda05/repo-check/internal/gitrepo"
 )
 
+// Discover returns sorted, deduplicated checkout paths from the registry.
+// It scans folders one level deep and can return partial results on error.
 func Discover(registry config.Registry) ([]string, error) {
 	paths := make(map[string]bool)
 	add := func(path string) {
@@ -60,6 +62,8 @@ func Discover(registry config.Registry) ([]string, error) {
 	return result, errors.Join(problems...)
 }
 
+// Select filters paths by path or unique directory name, keeping their input order.
+// An empty selector list selects all paths.
 func Select(paths, selectors []string) ([]string, error) {
 	if len(selectors) == 0 {
 		return paths, nil
@@ -106,12 +110,15 @@ type Result struct {
 	Status gitrepo.Status
 }
 
+// Run returns one check result per input path, in input order.
+// It limits concurrency to workers (at least one) and checks shared Git directories serially.
 func Run(ctx context.Context, paths []string, workers int) []Result {
 	type job struct {
 		index int
 		repo  *gitrepo.Repository
 	}
 	results := make([]Result, len(paths))
+	// Group worktrees by Git directory to avoid concurrent fetches into shared refs.
 	groups := make(map[string][]job)
 	for i, path := range paths {
 		results[i].Path = path
@@ -123,6 +130,7 @@ func Run(ctx context.Context, paths []string, workers int) []Result {
 		groups[repo.GitDir] = append(groups[repo.GitDir], job{index: i, repo: repo})
 	}
 
+	// Workers take whole groups and save each result at its original input index.
 	queue := make(chan []job)
 	var workersDone sync.WaitGroup
 	for range min(max(workers, 1), len(groups)) {

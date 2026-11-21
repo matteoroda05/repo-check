@@ -20,8 +20,7 @@ type advertisement struct {
 	defaultBranch plumbing.ReferenceName
 }
 
-// Use the remote's actual symbolic HEAD. Remote.ListContext can infer a branch
-// from a HEAD hash when the server omits the symbolic reference.
+// advertise takes the default branch from the remote's symbolic HEAD.
 func advertise(ctx context.Context, path string, remote *config.RemoteConfig) (string, advertisement, error) {
 	var result advertisement
 	if err := remote.Validate(); err != nil {
@@ -73,6 +72,7 @@ func advertise(ctx context.Context, path string, remote *config.RemoteConfig) (s
 	return url, result, nil
 }
 
+// fetch returns the local ref for each advertised branch it fetches for comparison.
 func (r *Repository) fetch(ctx context.Context, remote *config.RemoteConfig, url string,
 	advertised advertisement, plans []comparisonPlan) (map[plumbing.ReferenceName]plumbing.ReferenceName, error) {
 	destinations := make(map[plumbing.ReferenceName]plumbing.ReferenceName)
@@ -112,6 +112,7 @@ func (r *Repository) fetch(ctx context.Context, remote *config.RemoteConfig, url
 	return destinations, err
 }
 
+// fetchDestination returns the local ref and whether it can be force-updated.
 func (r *Repository) fetchDestination(remote *config.RemoteConfig, src plumbing.ReferenceName) (plumbing.ReferenceName, bool) {
 	for _, spec := range remote.Fetch {
 		if !spec.Match(src) {

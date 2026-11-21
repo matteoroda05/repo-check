@@ -12,6 +12,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
+// Relationship describes how the checkout's current commit compares with a target branch.
 type Relationship string
 
 const (
@@ -24,13 +25,16 @@ const (
 )
 
 type Comparison struct {
-	Kind         string
-	Target       string
+	// Kind labels the target's role, such as matching branch, default branch, or upstream.
+	Kind   string
+	Target string
+	// Tracking reports whether the target is the checkout's configured upstream.
 	Tracking     bool
 	Relationship Relationship
 	Err          error
 }
 
+// RemoteStatus groups one remote's comparisons. Err records a discovery or fetch failure.
 type RemoteStatus struct {
 	Name        string
 	Comparisons []Comparison
@@ -41,14 +45,18 @@ type Status struct {
 	Head    string
 	Note    string
 	Remotes []RemoteStatus
-	Local   []Comparison
-	Err     error
+	// Local holds upstream rows that cannot be grouped under a configured remote.
+	Local []Comparison
+	// Err records a checkout-level failure that prevented checking its remotes.
+	Err error
 }
 
+// Check fetches the refs needed for the checkout's branch comparisons.
 func (r *Repository) Check(ctx context.Context) Status {
 	var status Status
 	var branch plumbing.ReferenceName
 	var tip *object.Commit
+	// Resolve HEAD while allowing detached checkouts and branches with no commits.
 	headRef, err := r.repo.Reference(plumbing.HEAD, false)
 	if err != nil {
 		status.Err = fmt.Errorf("read HEAD: %w", err)
@@ -88,6 +96,7 @@ func (r *Repository) Check(ctx context.Context) Status {
 		status.Err = fmt.Errorf("read shallow history: %w", err)
 		return status
 	}
+	// Handle missing upstreams and upstreams outside the remote loop.
 	tracking := cfg.Branches[branch.Short()]
 	if branch != "" && tip != nil {
 		switch {
@@ -104,6 +113,7 @@ func (r *Repository) Check(ctx context.Context) Status {
 		}
 	}
 
+	// Check remotes in display order with a separate timeout for each.
 	names := make([]string, 0, len(cfg.Remotes))
 	for name := range cfg.Remotes {
 		names = append(names, name)
@@ -138,6 +148,8 @@ func (r *Repository) compare(tip *object.Commit, shallow bool, ref plumbing.Refe
 	return result
 }
 
+// relationship compares two commit tips by ancestry, from the perspective of tip.
+// With shallow history, only identical tips can be classified.
 func relationship(tip, other *object.Commit, shallow bool) (Relationship, error) {
 	if tip.Hash == other.Hash {
 		return Current, nil
@@ -162,6 +174,7 @@ func relationship(tip, other *object.Commit, shallow bool) (Relationship, error)
 	return Diverged, nil
 }
 
+// checkRemote reports the configured upstream separately when its name differs from the local branch.
 func (r *Repository) checkRemote(ctx context.Context, remote *config.RemoteConfig, branch plumbing.ReferenceName,
 	tracking *config.Branch, tip *object.Commit, shallow bool) RemoteStatus {
 	result := RemoteStatus{Name: remote.Name}
@@ -186,6 +199,7 @@ func (r *Repository) checkRemote(ctx context.Context, remote *config.RemoteConfi
 		if fetchErr != nil {
 			result.Err = fmt.Errorf("fetch: %w", fetchErr)
 		}
+		// Use the advertised branch list so stale local refs cannot hide deletions.
 		for _, plan := range plans {
 			item := plan.comparison(remote.Name)
 			switch {
@@ -200,6 +214,7 @@ func (r *Repository) checkRemote(ctx context.Context, remote *config.RemoteConfi
 		}
 		return result
 	}
+	// Keep the planned rows visible as unavailable if remote discovery fails.
 	for _, plan := range append(plans, comparisonPlan{kind: "Default branch"}) {
 		result.Comparisons = append(result.Comparisons, plan.comparison(remote.Name))
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestCheckFork verifies fresh fork and upstream comparisons and preservation of local work.
 func TestCheckFork(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("Git is required to create and serve the local fixtures")
@@ -24,6 +25,7 @@ func TestCheckFork(t *testing.T) {
 	runGit(t, fork, "commit", "--allow-empty", "-m", "feature base")
 	runGit(t, root, "clone", "-b", "feature/login", fork, local)
 	runGit(t, local, "remote", "add", "upstream", "../parent")
+	// Give the local checkout and the fork different commits on the same branch.
 	runGit(t, local, "commit", "--allow-empty", "-m", "local work")
 	runGit(t, fork, "commit", "--allow-empty", "-m", "remote work")
 	runGit(t, parent, "commit", "--allow-empty", "-m", "new trunk commit")
@@ -31,6 +33,7 @@ func TestCheckFork(t *testing.T) {
 	runGit(t, fork, "checkout", "main")
 	runGit(t, local, "update-ref", "refs/remotes/upstream/feature/login", "HEAD")
 
+	// Include staged, unstaged, and untracked work to check preservation.
 	draft := filepath.Join(local, "draft.txt")
 	if err := os.WriteFile(draft, []byte("unfinished work"), 0o600); err != nil {
 		t.Fatal(err)
@@ -67,6 +70,7 @@ func TestCheckFork(t *testing.T) {
 		t.Fatal("check changed the checked-out commit or working tree")
 	}
 
+	// Verify a differently named upstream gets its own comparison row.
 	runGit(t, local, "branch", "--set-upstream-to=origin/main", "feature/login")
 	status = repo.Check(context.Background())
 	assertRemote(t, status.Remotes[0], "origin", []Comparison{
